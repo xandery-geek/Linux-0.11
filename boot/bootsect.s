@@ -33,7 +33,7 @@
 	begbss:
 	.text
 
-	.equ SETUPLEN, 4		# nr of setup-sectors
+	.equ SETUPLEN, 4		# nr(number) of setup-sectors
 	.equ BOOTSEG, 0x07c0		# original address of boot-sector
 	.equ INITSEG, 0x9000		# we move boot here - out of the way
 	.equ SETUPSEG, 0x9020		# setup starts here
@@ -48,21 +48,22 @@
 	.equ ROOT_DEV, 0x301
 	ljmp    $BOOTSEG, $_start
 _start:
-	mov	$BOOTSEG, %ax	#将ds段寄存器设置为0x7C0
+	mov	$BOOTSEG, %ax	#将ds段寄存器设置为0x07c0
 	mov	%ax, %ds
-	mov	$INITSEG, %ax	#将es段寄存器设置为0x900
+	mov	$INITSEG, %ax	#将es段寄存器设置为0x9000
 	mov	%ax, %es
 	mov	$256, %cx		#设置移动计数值256字
 	sub	%si, %si		#源地址	ds:si = 0x07C0:0x0000
 	sub	%di, %di		#目标地址 es:si = 0x9000:0x0000
 	rep					#重复执行并递减cx的值
 	movsw				#从内存[si]处移动cx个字到[di]处
-	ljmp	$INITSEG, $go	#段间跳转，这里INITSEG指出跳转到的段地址，解释了cs的值为0x9000
+	ljmp	$INITSEG, $go	#段间跳转，这里INITSEG指出跳转到的段地址（0x9000）， go是段内地址，实现了在复制代码后在新的地方继续执行。
+
 go:	mov	%cs, %ax		#将ds，es，ss都设置成移动后代码所在的段处(0x9000)
 	mov	%ax, %ds
 	mov	%ax, %es
-# put stack at 0x9ff00.
-	mov	%ax, %ss
+# put stack at 0x9ff00. # 设置栈地址为0x9ff00（SS : 0x9000, SP 0xff00）
+	mov	%ax, %ss         
 	mov	$0xFF00, %sp		# arbitrary value >>512
 
 # load the setup-sectors directly after the bootblock.
@@ -81,6 +82,8 @@ load_setup:
 	.equ    AX, 0x0200+SETUPLEN
 	mov     $AX, %ax		# service 2, nr of sectors
 	int	$0x13			# read it
+
+	# 如果成功，则跳转到ok_load_setup，负责重新执行load_setup
 	jnc	ok_load_setup		# ok - continue
 	mov	$0x0000, %dx
 	mov	$0x0000, %ax		# reset the diskette
@@ -148,7 +151,7 @@ root_defined:
 # the setup-routine loaded directly after
 # the bootblock:
 
-	ljmp	$SETUPSEG, $0
+	ljmp	$SETUPSEG, $0 # 根据之前的规划，$SETUPSEG对应的地址就是setup.s所在的地址
 
 # This routine loads the system at address 0x10000, making sure
 # no 64kB boundaries are crossed. We try to load it as fast as
